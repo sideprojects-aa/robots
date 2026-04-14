@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { robotColor } from '../utils/palette'
 import type { Position } from '../simulation/Simulation'
 
@@ -15,44 +15,79 @@ type Snapshot = {
 
 const props = defineProps<{ snapshot: Snapshot | null }>()
 
-type Bounds = { minX: number; maxX: number; minY: number; maxY: number }
+const CELL = 18 // pixels per world unit at zoom = 1
+const DEFAULT_ZOOM = 3
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 12
 
-const CELL = 18
+const chartEl = ref<HTMLElement | null>(null)
+const size = ref({ w: 480, h: 400 })
 
-const bounds = computed<Bounds>(() => {
-  const b: Bounds = { minX: -4, maxX: 4, minY: -4, maxY: 4 }
-  if (!props.snapshot) return b
-  for (const h of props.snapshot.houses) {
-    if (h.x < b.minX) b.minX = h.x
-    if (h.x > b.maxX) b.maxX = h.x
-    if (h.y < b.minY) b.minY = h.y
-    if (h.y > b.maxY) b.maxY = h.y
+const zoom = ref(DEFAULT_ZOOM)
+const pan = ref({ x: 0, y: 0 }) // world coords at the viewport center
+
+let resizeObs: ResizeObserver | null = null
+
+onMounted(() => {
+  if (!chartEl.value) return
+  const measure = () => {
+    const r = chartEl.value!.getBoundingClientRect()
+    if (r.width && r.height) size.value = { w: r.width, h: r.height }
   }
-  for (const r of props.snapshot.positions) {
-    if (r.x < b.minX) b.minX = r.x
-    if (r.x > b.maxX) b.maxX = r.x
-    if (r.y < b.minY) b.minY = r.y
-    if (r.y > b.maxY) b.maxY = r.y
+  measure()
+  resizeObs = new ResizeObserver(measure)
+  resizeObs.observe(chartEl.value)
+})
+
+onBeforeUnmount(() => {
+  resizeObs?.disconnect()
+  window.removeEventListener('mousemove', onGlobalMove)
+  window.removeEventListener('mouseup', onGlobalUp)
+})
+
+const viewBox = computed(() => {
+  const { w, h } = size.value
+  const vbW = w / zoom.value
+  const vbH = h / zoom.value
+  const vbX = pan.value.x * CELL - vbW / 2
+  const vbY = -pan.value.y * CELL - vbH / 2 // y inverted (screen y grows downward)
+  return { x: vbX, y: vbY, w: vbW, h: vbH, str: `${vbX} ${vbY} ${vbW} ${vbH}` }
+})
+
+// Which integer cells are (partially) visible right now
+const visibleRange = computed(() => {
+  const { x, y, w, h } = viewBox.value
+  return {
+    minX: Math.floor(x / CELL) - 1,
+    maxX: Math.ceil((x + w) / CELL) + 1,
+    // viewBox y is inverted from world y
+    minY: Math.floor(-(y + h) / CELL) - 1,
+    maxY: Math.ceil(-y / CELL) + 1,
   }
-  b.minX -= 3
-  b.maxX += 3
-  b.minY -= 3
-  b.maxY += 3
-  return b
 })
 
 const cellX = (x: number) => x * CELL
 const cellY = (y: number) => -y * CELL
 
-const viewport = computed(() => {
-  const b = bounds.value
-  const w = (b.maxX - b.minX + 1) * CELL
-  const h = (b.maxY - b.minY + 1) * CELL
-  return {
-    width: w,
-    height: h,
-    viewBox: `${(b.minX - 0.5) * CELL} ${-(b.maxY + 0.5) * CELL} ${w} ${h}`,
-  }
+const vLines = computed(() => {
+  const out: number[] = []
+  const { minX, maxX } = visibleRange.value
+  for (let x = minX; x <= maxX + 1; x += 1) out.push(cellX(x) - CELL / 2)
+  return out
+})
+const hLines = computed(() => {
+  const out: number[] = []
+  const { minY, maxY } = visibleRange.value
+  for (let y = minY; y <= maxY + 1; y += 1) out.push(cellY(y) - CELL / 2)
+  return out
+})
+const vLineExtent = computed(() => {
+  const { minY, maxY } = visibleRange.value
+  return { y1: -(maxY + 1) * CELL, y2: -(minY - 1) * CELL }
+})
+const hLineExtent = computed(() => {
+  const { minX, maxX } = visibleRange.value
+  return { x1: (minX - 1) * CELL, x2: (maxX + 1) * CELL }
 })
 
 const houses = computed<HouseCell[]>(() => props.snapshot?.houses ?? [])
@@ -68,9 +103,9 @@ function heatAlpha(count: number): number {
   return 0.22 + t * 0.55
 }
 
-const robots = computed(() => props.snapshot?.positions ?? [])
+const robots = computed<Position[]>(() => props.snapshot?.positions ?? [])
 
-function robotOffset(index: number, positions: Position[]): { dx: number; dy: number } {
+function robotOffset(index: number, positions: Position[]) {
   const me = positions[index]
   const peers = positions
     .map((p, i) => ({ p, i }))
@@ -82,64 +117,130 @@ function robotOffset(index: number, positions: Position[]): { dx: number; dy: nu
   return { dx: Math.cos(angle) * r, dy: Math.sin(angle) * r }
 }
 
-const vLines = computed(() => {
-  const b = bounds.value
-  const out: { x: number; axis: boolean }[] = []
-  for (let x = b.minX; x <= b.maxX + 1; x += 1) {
-    out.push({ x: cellX(x) - CELL / 2, axis: x === 0 })
-  }
-  return out
-})
+/* ─── pan (mouse drag) ─────────────────────────────── */
+type Drag = { mx: number; my: number; px: number; py: number }
+let drag: Drag | null = null
+const isDragging = ref(false)
 
-const hLines = computed(() => {
-  const b = bounds.value
-  const out: { y: number; axis: boolean }[] = []
-  for (let y = b.minY; y <= b.maxY + 1; y += 1) {
-    out.push({ y: cellY(y) - CELL / 2, axis: y === 0 })
+function onMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return
+  drag = { mx: e.clientX, my: e.clientY, px: pan.value.x, py: pan.value.y }
+  isDragging.value = true
+  window.addEventListener('mousemove', onGlobalMove)
+  window.addEventListener('mouseup', onGlobalUp)
+}
+function onGlobalMove(e: MouseEvent) {
+  if (!drag) return
+  const dx = (e.clientX - drag.mx) / (CELL * zoom.value)
+  const dy = (e.clientY - drag.my) / (CELL * zoom.value)
+  pan.value = { x: drag.px - dx, y: drag.py + dy }
+}
+function onGlobalUp() {
+  drag = null
+  isDragging.value = false
+  window.removeEventListener('mousemove', onGlobalMove)
+  window.removeEventListener('mouseup', onGlobalUp)
+}
+
+/* ─── zoom (mouse wheel) ───────────────────────────── */
+function onWheel(e: WheelEvent) {
+  e.preventDefault()
+  const el = chartEl.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const mx = e.clientX - rect.left
+  const my = e.clientY - rect.top
+
+  // world point under cursor BEFORE zoom
+  const { x: vbx, y: vby, w: vbw, h: vbh } = viewBox.value
+  const worldX = (vbx + (mx / rect.width) * vbw) / CELL
+  const worldY = -(vby + (my / rect.height) * vbh) / CELL
+
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+  const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value * factor))
+  if (newZoom === zoom.value) return
+  zoom.value = newZoom
+
+  // Adjust pan so (worldX, worldY) stays under the cursor after zoom
+  const newVbW = rect.width / newZoom
+  const newVbH = rect.height / newZoom
+  pan.value = {
+    x: worldX - (mx / rect.width - 0.5) * (newVbW / CELL),
+    y: worldY + (my / rect.height - 0.5) * (newVbH / CELL),
   }
-  return out
-})
+}
+
+function recenter() {
+  pan.value = { x: 0, y: 0 }
+  zoom.value = DEFAULT_ZOOM
+}
+
+const zoomLabel = computed(() => `${zoom.value.toFixed(1)}×`)
+const panLabel = computed(() => `${pan.value.x.toFixed(1)}, ${pan.value.y.toFixed(1)}`)
 </script>
 
 <template>
   <section class="panel">
     <header class="panel-head">
       <h2>Grid</h2>
-      <span v-if="snapshot" class="extent">
-        x [{{ bounds.minX + 1 }}, {{ bounds.maxX - 1 }}] · y [{{ bounds.minY + 1 }}, {{ bounds.maxY - 1 }}]
-      </span>
+      <div class="head-actions">
+        <span class="hud">zoom {{ zoomLabel }} · center ({{ panLabel }})</span>
+        <button class="btn-icon" :disabled="!snapshot" @click="recenter" title="Recenter on origin">
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+            <circle cx="6" cy="6" r="2" fill="currentColor" />
+            <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1" />
+            <line x1="6" y1="0" x2="6" y2="2" stroke="currentColor" stroke-width="1" />
+            <line x1="6" y1="10" x2="6" y2="12" stroke="currentColor" stroke-width="1" />
+            <line x1="0" y1="6" x2="2" y2="6" stroke="currentColor" stroke-width="1" />
+            <line x1="10" y1="6" x2="12" y2="6" stroke="currentColor" stroke-width="1" />
+          </svg>
+          Recenter
+        </button>
+      </div>
     </header>
 
     <div v-if="!snapshot" class="empty">No simulation running.</div>
 
-    <div v-else class="chart">
+    <div
+      v-else
+      ref="chartEl"
+      class="chart"
+      :class="{ dragging: isDragging }"
+      @mousedown="onMouseDown"
+      @wheel="onWheel"
+    >
       <svg
-        :viewBox="viewport.viewBox"
-        preserveAspectRatio="xMidYMid meet"
+        :viewBox="viewBox.str"
+        preserveAspectRatio="xMidYMid slice"
+        width="100%"
+        height="100%"
         role="img"
-        aria-label="Grid visualization of delivered houses and robot positions"
+        aria-label="Grid visualization of delivered houses and robot positions. Drag to pan, scroll to zoom."
       >
         <g class="grid-v">
           <line
-            v-for="(l, i) in vLines"
+            v-for="(x, i) in vLines"
             :key="`v${i}`"
-            :class="{ axis: l.axis }"
-            :x1="l.x"
-            :x2="l.x"
-            :y1="-(bounds.maxY + 0.5) * CELL"
-            :y2="-(bounds.minY - 0.5) * CELL"
+            :x1="x"
+            :x2="x"
+            :y1="vLineExtent.y1"
+            :y2="vLineExtent.y2"
           />
         </g>
         <g class="grid-h">
           <line
-            v-for="(l, i) in hLines"
+            v-for="(y, i) in hLines"
             :key="`h${i}`"
-            :class="{ axis: l.axis }"
-            :y1="l.y"
-            :y2="l.y"
-            :x1="(bounds.minX - 0.5) * CELL"
-            :x2="(bounds.maxX + 0.5) * CELL"
+            :y1="y"
+            :y2="y"
+            :x1="hLineExtent.x1"
+            :x2="hLineExtent.x2"
           />
+        </g>
+
+        <!-- origin marker -->
+        <g class="origin">
+          <circle :cx="cellX(0)" :cy="cellY(0)" r="1.5" />
         </g>
 
         <g class="houses">
@@ -186,6 +287,7 @@ const hLines = computed(() => {
         <span class="sw-heat" />
         present cell
       </div>
+      <div class="legend-item subtle help">drag to pan · scroll to zoom</div>
     </footer>
   </section>
 </template>
@@ -206,6 +308,7 @@ const hLines = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
 }
 h2 {
   margin: 0;
@@ -213,11 +316,39 @@ h2 {
   font-weight: 600;
   color: var(--text);
 }
-.extent {
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hud {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+.btn-icon {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.btn-icon:hover:not(:disabled) {
+  border-color: #3a3a3a;
+  color: var(--text);
+}
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .empty {
@@ -230,30 +361,31 @@ h2 {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 12px;
   min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.chart.dragging {
+  cursor: grabbing;
 }
 
 svg {
   display: block;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
 }
 
 .grid-v line,
 .grid-h line {
   stroke: var(--border);
   stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
-.grid-v line.axis,
-.grid-h line.axis {
-  stroke: var(--border-bright);
+
+.origin circle {
+  fill: var(--muted);
 }
 
 .house rect {
@@ -294,6 +426,7 @@ svg {
   padding-top: 2px;
   font-size: 11px;
   color: var(--text-dim);
+  align-items: center;
 }
 .legend-item {
   display: inline-flex;
@@ -302,6 +435,9 @@ svg {
 }
 .legend-item.subtle {
   color: var(--muted);
+}
+.legend-item.help {
+  margin-left: auto;
 }
 .sw {
   width: 8px;
