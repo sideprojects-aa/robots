@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   numRobots: number
   moves: string
   isRunning: boolean
@@ -19,6 +19,11 @@ const emit = defineEmits<{
 function onNum(v: string) {
   const n = Number.parseInt(v, 10)
   if (Number.isFinite(n)) emit('update:numRobots', n)
+}
+
+function append(ch: string) {
+  if (props.isRunning) return
+  emit('update:moves', props.moves + ch)
 }
 </script>
 
@@ -53,7 +58,15 @@ function onNum(v: string) {
         @input="emit('update:moves', ($event.target as HTMLTextAreaElement).value)"
       />
       <div class="hint">
-        <kbd>^</kbd> <kbd>V</kbd> <kbd>&lt;</kbd> <kbd>&gt;</kbd>
+        <button
+          v-for="c in ['^', 'V', '<', '>']"
+          :key="c"
+          type="button"
+          class="key"
+          :disabled="isRunning"
+          :aria-label="`Append ${c}`"
+          @click="append(c)"
+        >{{ c }}</button>
       </div>
     </div>
 
@@ -141,19 +154,34 @@ textarea:disabled {
   gap: 4px;
   margin-top: 2px;
 }
-kbd {
+.key {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
   border: 1px solid var(--border-bright);
   border-radius: 4px;
   background: var(--surface-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.key:hover:not(:disabled) {
+  color: var(--text);
+  border-color: #3a3a3a;
+  background: #1a1a1a;
+}
+.key:active:not(:disabled) {
+  background: #222;
+}
+.key:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .error {
