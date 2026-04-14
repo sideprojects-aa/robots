@@ -1,19 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { robotColor } from '../utils/palette'
-import type { Position } from '../simulation/Simulation'
+import type { House, Position, SimulationSnapshot } from '../simulation/types'
 
-type HouseCell = { x: number; y: number; count: number }
-type Snapshot = {
-  positions: Position[]
-  totalPresents: number
-  houses: HouseCell[]
-  currentTurn: number
-  totalTurns: number
-  nextRobot: number | null
-}
-
-const props = defineProps<{ snapshot: Snapshot | null }>()
+const props = defineProps<{ snapshot: SimulationSnapshot | null }>()
 
 const CELL = 18 // pixels per world unit at zoom = 1
 const DEFAULT_ZOOM = 2.2
@@ -97,7 +87,7 @@ const hLineExtent = computed(() => {
   return { x1: (minX - 1) * CELL, x2: (maxX + 1) * CELL }
 })
 
-const houses = computed<HouseCell[]>(() => props.snapshot?.houses ?? [])
+const houses = computed<House[]>(() => props.snapshot?.houses ?? [])
 
 const maxCount = computed(() => {
   let m = 1

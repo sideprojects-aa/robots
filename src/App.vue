@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Simulation } from './simulation/Simulation'
-import type { Position } from './simulation/Simulation'
+import type { SimulationSnapshot } from './simulation/types'
 import ControlPanel from './components/ControlPanel.vue'
 import StatsPanel from './components/StatsPanel.vue'
 import GridView from './components/GridView.vue'
@@ -22,27 +22,13 @@ const isComplete = computed(() => {
   return sim?.isComplete ?? false
 })
 
-type Snapshot = {
-  positions: Position[]
-  totalPresents: number
-  houses: { x: number; y: number; count: number }[]
-  currentTurn: number
-  totalTurns: number
-  nextRobot: number | null
-}
-
-const snapshot = computed<Snapshot | null>(() => {
+const snapshot = computed<SimulationSnapshot | null>(() => {
   tick.value
   if (!sim) return null
-  const houses: Snapshot['houses'] = []
-  for (const [key, count] of sim.getHouses()) {
-    const [x, y] = key.split(',').map(Number)
-    houses.push({ x, y, count })
-  }
   return {
     positions: sim.getPositions(),
     totalPresents: sim.totalPresentsDelivered,
-    houses,
+    houses: sim.getHouses(),
     currentTurn: sim.currentTurn,
     totalTurns: sim.moves.length,
     nextRobot: sim.nextRobotIndex,

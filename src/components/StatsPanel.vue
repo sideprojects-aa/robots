@@ -1,18 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { robotColor } from '../utils/palette'
-import type { Position } from '../simulation/Simulation'
+import type { Position, SimulationSnapshot } from '../simulation/types'
 
-type Snapshot = {
-  positions: Position[]
-  totalPresents: number
-  houses: { x: number; y: number; count: number }[]
-  currentTurn: number
-  totalTurns: number
-  nextRobot: number | null
-}
-
-const props = defineProps<{ snapshot: Snapshot | null }>()
+const props = defineProps<{ snapshot: SimulationSnapshot | null }>()
 
 const n = ref(1)
 

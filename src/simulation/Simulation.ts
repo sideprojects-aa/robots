@@ -1,4 +1,6 @@
-export type Position = { readonly x: number; readonly y: number }
+import type { House, Position } from './types'
+
+export type { House, Position, SimulationSnapshot } from './types'
 
 export type Move = '^' | 'V' | '<' | '>'
 
@@ -55,8 +57,21 @@ export class Simulation {
     return this.robots.map((r) => ({ x: r.x, y: r.y }))
   }
 
-  getHouses(): ReadonlyMap<string, number> {
-    return this.houses
+  /**
+   * Snapshot of every house that has received at least one present,
+   * with its integer coordinates and delivery count.
+   */
+  getHouses(): House[] {
+    const out: House[] = []
+    for (const [key, count] of this.houses) {
+      const comma = key.indexOf(',')
+      out.push({
+        x: Number(key.slice(0, comma)),
+        y: Number(key.slice(comma + 1)),
+        count,
+      })
+    }
+    return out
   }
 
   /** Advance one instruction. Returns false if the simulation is already complete. */
