@@ -258,6 +258,22 @@ const panLabel = computed(() => `${pan.value.x.toFixed(1)}, ${pan.value.y.toFixe
           />
         </g>
 
+        <!-- axes through origin (lighter than the rest of the grid) -->
+        <g class="axes">
+          <line
+            :x1="hLineExtent.x1"
+            :x2="hLineExtent.x2"
+            :y1="cellY(0)"
+            :y2="cellY(0)"
+          />
+          <line
+            :y1="vLineExtent.y1"
+            :y2="vLineExtent.y2"
+            :x1="cellX(0)"
+            :x2="cellX(0)"
+          />
+        </g>
+
         <!-- origin marker -->
         <g class="origin">
           <circle :cx="cellX(0)" :cy="cellY(0)" r="1.5" />
@@ -400,6 +416,12 @@ svg {
 .grid-v line,
 .grid-h line {
   stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.axes line {
+  stroke: #323641;
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
