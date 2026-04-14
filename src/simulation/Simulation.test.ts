@@ -12,6 +12,14 @@ describe('Simulation', () => {
       ])
     })
 
+    it('defaults to a single robot and an empty move sequence', () => {
+      const sim = new Simulation()
+      expect(sim.numRobots).toBe(1)
+      expect(sim.moves).toBe('')
+      expect(sim.getPositions()).toEqual([{ x: 0, y: 0 }])
+      expect(sim.isComplete).toBe(true)
+    })
+
     it('rejects zero or negative robot counts', () => {
       expect(() => new Simulation(0, '')).toThrow(RangeError)
       expect(() => new Simulation(-1, '')).toThrow(RangeError)

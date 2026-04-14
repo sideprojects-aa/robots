@@ -20,7 +20,7 @@ export class Simulation {
   private turn = 0
   private delivered = 0
 
-  constructor(numRobots: number, moves: string) {
+  constructor(numRobots: number = 1, moves: string = '') {
     if (!Number.isInteger(numRobots) || numRobots < 1) {
       throw new RangeError('numRobots must be an integer >= 1')
     }

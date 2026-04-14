@@ -54,6 +54,7 @@ The simulation core is deliberately framework-free so it's trivial to test in is
 ```ts
 import { Simulation } from './simulation/Simulation'
 
+// numRobots defaults to 1, moves defaults to '' (both params optional)
 const sim = new Simulation(3, '^^VV<>')
 sim.step()                    // advance one instruction; returns false when done
 sim.run()                     // run the remaining sequence
