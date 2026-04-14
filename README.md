@@ -2,9 +2,11 @@
 
 A small Vue 3 + TypeScript app that runs the Robbie-the-Robot simulation from the exercise brief. Multiple robots take turns walking an infinite grid and delivering presents to the houses they land on.
 
+**Live demo:** https://sideprojects-aa.github.io/robots/
+
 ## Prerequisites
 
-- Node.js 20+ (tested on Node 24)
+- Node.js 20+ (pinned via `.nvmrc`; tested on Node 24)
 - npm
 
 ## Running
