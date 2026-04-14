@@ -237,6 +237,22 @@ const panLabel = computed(() => `${pan.value.x.toFixed(1)}, ${pan.value.y.toFixe
         role="img"
         aria-label="Grid visualization of delivered houses and robot positions. Drag to pan, scroll to zoom."
       >
+        <!-- shade the row at y=0 and the column at x=0 -->
+        <g class="axis-bands">
+          <rect
+            :x="hLineExtent.x1"
+            :y="cellY(0) - CELL / 2"
+            :width="hLineExtent.x2 - hLineExtent.x1"
+            :height="CELL"
+          />
+          <rect
+            :x="cellX(0) - CELL / 2"
+            :y="vLineExtent.y1"
+            :width="CELL"
+            :height="vLineExtent.y2 - vLineExtent.y1"
+          />
+        </g>
+
         <g class="grid-v">
           <line
             v-for="(x, i) in vLines"
@@ -255,22 +271,6 @@ const panLabel = computed(() => `${pan.value.x.toFixed(1)}, ${pan.value.y.toFixe
             :y2="y"
             :x1="hLineExtent.x1"
             :x2="hLineExtent.x2"
-          />
-        </g>
-
-        <!-- axes through origin (lighter than the rest of the grid) -->
-        <g class="axes">
-          <line
-            :x1="hLineExtent.x1"
-            :x2="hLineExtent.x2"
-            :y1="cellY(0)"
-            :y2="cellY(0)"
-          />
-          <line
-            :y1="vLineExtent.y1"
-            :y2="vLineExtent.y2"
-            :x1="cellX(0)"
-            :x2="cellX(0)"
           />
         </g>
 
@@ -420,10 +420,8 @@ svg {
   vector-effect: non-scaling-stroke;
 }
 
-.axes line {
-  stroke: #323641;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
+.axis-bands rect {
+  fill: rgba(237, 237, 237, 0.03);
 }
 
 .origin circle {
