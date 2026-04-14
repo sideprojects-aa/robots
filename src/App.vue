@@ -6,11 +6,15 @@ import ControlPanel from './components/ControlPanel.vue'
 import StatsPanel from './components/StatsPanel.vue'
 import GridView from './components/GridView.vue'
 
-const STEP_INTERVAL_MS = 200
+const STEP_INTERVAL_MS = 100
+const DEFAULT_NAMES = ['robbie', 'jane', 'bob']
+const NAME_SUGGESTIONS = ['robbie', 'jane', 'bob', 'ada', 'leo', 'mia', 'ken', 'yuki']
 
-const numRobots = ref(3)
+const robotNames = ref<string[]>([...DEFAULT_NAMES])
 const moves = ref('^^VV<>')
 const error = ref<string | null>(null)
+
+const numRobots = computed(() => robotNames.value.length)
 
 let sim: Simulation | null = null
 const tick = ref(0)
@@ -24,11 +28,20 @@ const isComplete = computed(() => {
   return sim?.isComplete ?? false
 })
 
+function nameFor(index: number, existing: string[]): string {
+  const base = NAME_SUGGESTIONS[index] ?? `robot ${index + 1}`
+  if (!existing.includes(base)) return base
+  let n = 2
+  while (existing.includes(`${base} ${n}`)) n += 1
+  return `${base} ${n}`
+}
+
 const snapshot = computed<SimulationSnapshot | null>(() => {
   tick.value
   if (!sim) return null
   return {
     positions: sim.getPositions(),
+    names: robotNames.value.slice(0, sim.numRobots),
     totalPresents: sim.totalPresentsDelivered,
     houses: sim.getHouses(),
     currentTurn: sim.currentTurn,
@@ -66,6 +79,30 @@ function start() {
     sim = null
   }
   tick.value += 1
+}
+
+function jumpTo(turn: number) {
+  if (!sim) return
+  stopAutoRun()
+  const target = Math.max(0, Math.min(sim.moves.length, Math.round(turn)))
+  // Simulation is forward-only; rebuild from scratch and fast-forward to target.
+  const fresh = new Simulation(sim.numRobots, sim.moves)
+  for (let i = 0; i < target; i += 1) fresh.step()
+  sim = fresh
+  tick.value += 1
+}
+
+function addRobot() {
+  robotNames.value = [...robotNames.value, nameFor(robotNames.value.length, robotNames.value)]
+}
+function removeRobot(index: number) {
+  if (robotNames.value.length <= 1) return
+  robotNames.value = robotNames.value.filter((_, i) => i !== index)
+}
+function renameRobot(index: number, name: string) {
+  const next = [...robotNames.value]
+  next[index] = name
+  robotNames.value = next
 }
 
 function reset() {
@@ -144,18 +181,21 @@ onBeforeUnmount(stopAutoRun)
     <section class="workspace">
       <div class="col-left">
         <ControlPanel
-          v-model:num-robots="numRobots"
+          :robot-names="robotNames"
           v-model:moves="moves"
           :is-running="isRunning"
           :is-complete="isComplete"
           :is-auto-running="isAutoRunning"
           :error="error"
+          @add-robot="addRobot"
+          @remove-robot="removeRobot"
+          @rename-robot="({ index, name }: { index: number; name: string }) => renameRobot(index, name)"
           @start="start"
           @reset="reset"
           @step="step"
           @run="runAll"
         />
-        <StatsPanel :snapshot="snapshot" />
+        <StatsPanel :snapshot="snapshot" @scrub="jumpTo" />
       </div>
       <GridView class="col-right" :snapshot="snapshot" />
     </section>

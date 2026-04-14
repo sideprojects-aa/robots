@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
-  numRobots: number
+  robotNames: string[]
   moves: string
   isRunning: boolean
   isComplete: boolean
@@ -9,22 +9,24 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:numRobots', v: number): void
   (e: 'update:moves', v: string): void
+  (e: 'addRobot'): void
+  (e: 'removeRobot', index: number): void
+  (e: 'renameRobot', payload: { index: number; name: string }): void
   (e: 'start'): void
   (e: 'reset'): void
   (e: 'step'): void
   (e: 'run'): void
 }>()
 
-function onNum(v: string) {
-  const n = Number.parseInt(v, 10)
-  if (Number.isFinite(n)) emit('update:numRobots', n)
-}
-
 function append(ch: string) {
   if (props.isRunning) return
   emit('update:moves', props.moves + ch)
+}
+
+function onRename(i: number, e: Event) {
+  const name = (e.target as HTMLInputElement).value
+  emit('renameRobot', { index: i, name })
 }
 </script>
 
@@ -35,16 +37,32 @@ function append(ch: string) {
     </header>
 
     <div class="field">
-      <label for="num-robots">Robots</label>
-      <input
-        id="num-robots"
-        type="number"
-        min="1"
-        step="1"
-        :value="numRobots"
+      <label>Robots <span class="count">({{ robotNames.length }})</span></label>
+      <ul class="robot-list">
+        <li v-for="(name, i) in robotNames" :key="i">
+          <input
+            :value="name"
+            :disabled="isRunning"
+            maxlength="20"
+            spellcheck="false"
+            :aria-label="`Robot ${i + 1} name`"
+            @input="onRename(i, $event)"
+          />
+          <button
+            type="button"
+            class="remove"
+            :disabled="isRunning || robotNames.length <= 1"
+            :aria-label="`Remove ${name}`"
+            @click="emit('removeRobot', i)"
+          >×</button>
+        </li>
+      </ul>
+      <button
+        type="button"
+        class="add"
         :disabled="isRunning"
-        @input="onNum(($event.target as HTMLInputElement).value)"
-      />
+        @click="emit('addRobot')"
+      >+ Add robot</button>
     </div>
 
     <div class="field">
@@ -124,8 +142,90 @@ h2 {
   color: var(--muted);
   font-weight: 500;
 }
+.count {
+  color: var(--muted-low);
+  font-variant-numeric: tabular-nums;
+}
 
-input,
+/* robot name list */
+.robot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.robot-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px;
+  align-items: center;
+}
+.robot-list input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.robot-list input:focus {
+  border-color: #3a3a3a;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+.robot-list input:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  background: var(--surface-2);
+}
+.remove {
+  appearance: none;
+  width: 22px;
+  height: 26px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.remove:hover:not(:disabled) {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 40%, var(--border));
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+}
+.remove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.add {
+  appearance: none;
+  background: transparent;
+  border: 1px dashed var(--border-bright);
+  color: var(--text-dim);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  cursor: pointer;
+  justify-self: start;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.add:hover:not(:disabled) {
+  color: var(--text);
+  border-color: #3a3a3a;
+}
+.add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 textarea {
   width: 100%;
   background: var(--bg);
@@ -139,12 +239,10 @@ textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   resize: vertical;
 }
-input:focus,
 textarea:focus {
   border-color: #3a3a3a;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
 }
-input:disabled,
 textarea:disabled {
   color: var(--muted);
   cursor: not-allowed;

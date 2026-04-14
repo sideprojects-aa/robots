@@ -12,6 +12,7 @@ export type House = {
  */
 export type SimulationSnapshot = {
   positions: Position[]
+  names: string[]
   totalPresents: number
   houses: House[]
   currentTurn: number

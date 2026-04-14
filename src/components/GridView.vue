@@ -296,7 +296,7 @@ const panLabel = computed(() => `${pan.value.x.toFixed(1)}, ${pan.value.y.toFixe
               })`"
               class="robot"
             >
-              <circle r="7.5" :fill="robotColor(i)" />
+              <circle r="6" :fill="robotColor(i)" />
               <text class="robot-id">{{ i + 1 }}</text>
             </g>
           </template>
@@ -307,7 +307,7 @@ const panLabel = computed(() => `${pan.value.x.toFixed(1)}, ${pan.value.y.toFixe
     <footer v-if="snapshot && robots.length" class="legend">
       <div v-for="(_, i) in robots" :key="i" class="legend-item">
         <span class="sw" :style="{ background: robotColor(i) }" />
-        robot {{ i + 1 }}
+        {{ snapshot?.names[i] ?? `robot ${i + 1}` }}
       </div>
       <div class="legend-item subtle">
         <span class="sw-heat" />
