@@ -28,13 +28,20 @@ const pan = ref({ x: 0, y: 0 }) // world coords at the viewport center
 
 let resizeObs: ResizeObserver | null = null
 
+function measure() {
+  const el = chartEl.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  if (r.width && r.height) size.value = { w: r.width, h: r.height }
+}
+
 onMounted(() => {
   if (!chartEl.value) return
-  const measure = () => {
-    const r = chartEl.value!.getBoundingClientRect()
-    if (r.width && r.height) size.value = { w: r.width, h: r.height }
-  }
   measure()
+  // A second measurement after the first paint catches cases where the
+  // initial layout hadn't settled — a stale size makes pan feel amplified
+  // because viewBox-to-screen scale drifts away from 1:1.
+  requestAnimationFrame(measure)
   resizeObs = new ResizeObserver(measure)
   resizeObs.observe(chartEl.value)
 })
@@ -124,15 +131,25 @@ const isDragging = ref(false)
 
 function onMouseDown(e: MouseEvent) {
   if (e.button !== 0) return
+  // Re-measure at drag start so the pan math always matches the current
+  // rendered size (the viewBox is derived from `size`, so if `size` drifts
+  // from the element's real rect the drag feels amplified or compressed).
+  measure()
   drag = { mx: e.clientX, my: e.clientY, px: pan.value.x, py: pan.value.y }
   isDragging.value = true
   window.addEventListener('mousemove', onGlobalMove)
   window.addEventListener('mouseup', onGlobalUp)
 }
 function onGlobalMove(e: MouseEvent) {
-  if (!drag) return
-  const dx = (e.clientX - drag.mx) / (CELL * zoom.value)
-  const dy = (e.clientY - drag.my) / (CELL * zoom.value)
+  if (!drag || !chartEl.value) return
+  // Screen→world using the element's live rect width vs. the rendered viewBox width.
+  // viewBox width = size.w / zoom, so scale = rect.w / (size.w / zoom) = rect.w * zoom / size.w
+  // 1 screen px → 1/scale world_px = size.w / (rect.w * zoom * CELL) world units.
+  const rect = chartEl.value.getBoundingClientRect()
+  const scaleX = (rect.width * zoom.value) / size.value.w
+  const scaleY = (rect.height * zoom.value) / size.value.h
+  const dx = (e.clientX - drag.mx) / (CELL * scaleX)
+  const dy = (e.clientY - drag.my) / (CELL * scaleY)
   pan.value = { x: drag.px - dx, y: drag.py + dy }
 }
 function onGlobalUp() {
@@ -156,7 +173,10 @@ function onWheel(e: WheelEvent) {
   const worldX = (vbx + (mx / rect.width) * vbw) / CELL
   const worldY = -(vby + (my / rect.height) * vbh) / CELL
 
-  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+  // Exponential continuous zoom — responds proportionally to deltaY magnitude,
+  // so trackpad scrolling feels smooth and mouse-wheel notches still produce
+  // a noticeable step.
+  const factor = Math.exp(-e.deltaY * 0.0022)
   const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value * factor))
   if (newZoom === zoom.value) return
   zoom.value = newZoom
