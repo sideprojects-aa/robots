@@ -198,6 +198,8 @@ kbd {
 }
 .btn.primary:hover:not(:disabled) {
   background: #fff;
+  border-color: #fff;
+  color: #000;
 }
 .btn.ghost {
   margin-left: auto;
