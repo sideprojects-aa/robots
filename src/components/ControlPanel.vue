@@ -231,7 +231,6 @@ textarea:disabled {
 }
 .btn.ghost {
   margin-left: auto;
-  color: var(--muted);
 }
 .btn:disabled {
   opacity: 0.4;

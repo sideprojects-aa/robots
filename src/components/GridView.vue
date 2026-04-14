@@ -17,10 +17,10 @@ const props = defineProps<{ snapshot: Snapshot | null }>()
 
 type Bounds = { minX: number; maxX: number; minY: number; maxY: number }
 
-const CELL = 24
+const CELL = 18
 
 const bounds = computed<Bounds>(() => {
-  const b: Bounds = { minX: -2, maxX: 2, minY: -2, maxY: 2 }
+  const b: Bounds = { minX: -4, maxX: 4, minY: -4, maxY: 4 }
   if (!props.snapshot) return b
   for (const h of props.snapshot.houses) {
     if (h.x < b.minX) b.minX = h.x
@@ -34,10 +34,10 @@ const bounds = computed<Bounds>(() => {
     if (r.y < b.minY) b.minY = r.y
     if (r.y > b.maxY) b.maxY = r.y
   }
-  b.minX -= 1
-  b.maxX += 1
-  b.minY -= 1
-  b.maxY += 1
+  b.minX -= 3
+  b.maxX += 3
+  b.minY -= 3
+  b.maxY += 3
   return b
 })
 
