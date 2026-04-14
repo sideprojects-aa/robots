@@ -421,7 +421,7 @@ svg {
 }
 
 .axis-bands rect {
-  fill: rgba(237, 237, 237, 0.03);
+  fill: rgba(237, 237, 237, 0.07);
 }
 
 .origin circle {
