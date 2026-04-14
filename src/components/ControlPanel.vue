@@ -231,6 +231,13 @@ textarea:disabled {
 }
 .btn.ghost {
   margin-left: auto;
+  border-color: #ededed;
+  color: #ededed;
+}
+.btn.ghost:hover:not(:disabled) {
+  border-color: #ededed;
+  color: #ededed;
+  background: rgba(237, 237, 237, 0.08);
 }
 .btn:disabled {
   opacity: 0.4;
