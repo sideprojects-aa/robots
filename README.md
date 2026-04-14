@@ -14,7 +14,9 @@ npm install
 npm run dev        # local dev server (Vite) — http://127.0.0.1:5174 (or next free)
 npm run build      # type-check + production build
 npm run preview    # serve the production build locally
-npm test           # run the vitest unit tests
+npm test           # run the vitest unit + component tests
+npm run lint       # eslint — fails on warnings (max-warnings=0)
+npm run lint:fix   # eslint with auto-fix
 ```
 
 ## Things to try
@@ -90,4 +92,17 @@ sim.nextRobotIndex            // which robot moves next, or null if complete
 npm test
 ```
 
-Covers construction validation, round-robin turn dispatch, the brief's example, present stacking on revisits, and the shared-cell rule (first-arriver keeps their earlier delivery, later arriver gets none).
+36 tests across four files:
+
+- `src/simulation/Simulation.test.ts` — rule coverage for construction, round-robin dispatch, alone-on-cell delivery, revisits, house queries, `getHouses()` shape, `run()` vs manual stepping parity, mid-simulation state, and the rebuild-and-step pattern the scrub slider relies on.
+- `src/components/ControlPanel.test.ts` — renames, adds, and removes robots; emits the right events; disables inputs while running; toggles Start ↔ Step/Run/Reset.
+- `src/components/StatsPanel.test.ts` — renders snapshot data, highlights the next-to-move robot, emits `scrub` on slider drag, and computes `housesWithAtLeast(n)` in response to the number input.
+- `src/components/GridView.test.ts` — shows the empty state, renders one circle/rect per robot/house, lists names in the legend, updates the HUD on wheel zoom, and snaps back to defaults on Recenter.
+
+## Linting
+
+```sh
+npm run lint
+```
+
+ESLint with `eslint-plugin-vue` + `typescript-eslint` (flat config in `eslint.config.js`), set to fail the build on warnings.

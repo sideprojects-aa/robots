@@ -123,4 +123,82 @@ describe('Simulation', () => {
       expect(() => sim.housesWithAtLeast(1.5)).toThrow(RangeError)
     })
   })
+
+  describe('getHouses', () => {
+    it('returns structured {x, y, count} entries with numeric coordinates', () => {
+      const sim = new Simulation(1, '^>V<')
+      sim.run()
+      const houses = sim.getHouses()
+      expect(houses).toHaveLength(4)
+      for (const h of houses) {
+        expect(typeof h.x).toBe('number')
+        expect(typeof h.y).toBe('number')
+        expect(typeof h.count).toBe('number')
+      }
+      const coords = new Set(houses.map((h) => `${h.x},${h.y}`))
+      expect(coords).toEqual(new Set(['0,1', '1,1', '1,0', '0,0']))
+    })
+
+    it('reports accumulated counts for revisited cells', () => {
+      const sim = new Simulation(1, '^V^V^V')
+      sim.run()
+      const houses = sim.getHouses()
+      const byKey = new Map(houses.map((h) => [`${h.x},${h.y}`, h.count]))
+      expect(byKey.get('0,1')).toBe(3)
+      expect(byKey.get('0,0')).toBe(3)
+    })
+  })
+
+  describe('run vs. manual stepping', () => {
+    it('run() produces the same final state as repeated step() calls', () => {
+      const moves = '^^VV<><>^V<>'
+      const byRun = new Simulation(3, moves)
+      byRun.run()
+
+      const byStep = new Simulation(3, moves)
+      while (byStep.step()) {
+        // intentional
+      }
+
+      expect(byStep.totalPresentsDelivered).toBe(byRun.totalPresentsDelivered)
+      expect(byStep.getPositions()).toEqual(byRun.getPositions())
+      expect(byStep.getHouses()).toEqual(byRun.getHouses())
+    })
+  })
+
+  describe('mid-simulation queries', () => {
+    it('returns correct state between steps without requiring completion', () => {
+      const sim = new Simulation(3, '^^VV<>')
+
+      sim.step() // robbie ^
+      expect(sim.totalPresentsDelivered).toBe(1)
+      expect(sim.getPositions()[0]).toEqual({ x: 0, y: 1 })
+      expect(sim.currentTurn).toBe(1)
+      expect(sim.nextRobotIndex).toBe(1)
+
+      sim.step() // jane ^  (blocked by robbie at (0,1))
+      expect(sim.totalPresentsDelivered).toBe(1)
+      expect(sim.getPositions()[1]).toEqual({ x: 0, y: 1 })
+
+      sim.step() // bob V
+      expect(sim.totalPresentsDelivered).toBe(2)
+      expect(sim.housesWithAtLeast(1)).toBe(2)
+    })
+  })
+
+  describe('time-travel by re-stepping', () => {
+    it('rebuilding the simulation and stepping to turn N is deterministic', () => {
+      // This is what the UI's scrub slider relies on.
+      const moves = '^^VV<>^V<>'
+      const canonical = new Simulation(3, moves)
+      for (let i = 0; i < 5; i += 1) canonical.step()
+
+      const rebuilt = new Simulation(3, moves)
+      for (let i = 0; i < 5; i += 1) rebuilt.step()
+
+      expect(rebuilt.getPositions()).toEqual(canonical.getPositions())
+      expect(rebuilt.totalPresentsDelivered).toBe(canonical.totalPresentsDelivered)
+      expect(rebuilt.currentTurn).toBe(5)
+    })
+  })
 })

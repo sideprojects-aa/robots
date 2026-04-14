@@ -20,11 +20,11 @@ let sim: Simulation | null = null
 const tick = ref(0)
 
 const isRunning = computed(() => {
-  tick.value
+  void tick.value
   return sim !== null
 })
 const isComplete = computed(() => {
-  tick.value
+  void tick.value
   return sim?.isComplete ?? false
 })
 
@@ -37,7 +37,7 @@ function nameFor(index: number, existing: string[]): string {
 }
 
 const snapshot = computed<SimulationSnapshot | null>(() => {
-  tick.value
+  void tick.value
   if (!sim) return null
   return {
     positions: sim.getPositions(),
