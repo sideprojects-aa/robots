@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { Simulation } from './simulation/Simulation'
 import type { SimulationSnapshot } from './simulation/types'
 import ControlPanel from './components/ControlPanel.vue'
 import StatsPanel from './components/StatsPanel.vue'
 import GridView from './components/GridView.vue'
+
+const STEP_INTERVAL_MS = 200
 
 const numRobots = ref(3)
 const moves = ref('^^VV<>')
@@ -43,7 +45,19 @@ const stateLabel = computed(() => {
 
 const stateClass = computed(() => `state-${stateLabel.value}`)
 
+let runTimer: ReturnType<typeof setTimeout> | null = null
+const isAutoRunning = ref(false)
+
+function stopAutoRun() {
+  if (runTimer !== null) {
+    clearTimeout(runTimer)
+    runTimer = null
+  }
+  isAutoRunning.value = false
+}
+
 function start() {
+  stopAutoRun()
   try {
     sim = new Simulation(numRobots.value, moves.value)
     error.value = null
@@ -55,22 +69,34 @@ function start() {
 }
 
 function reset() {
+  stopAutoRun()
   sim = null
   error.value = null
   tick.value += 1
 }
 
 function step() {
-  if (!sim) return
+  if (!sim || isAutoRunning.value) return
   sim.step()
   tick.value += 1
 }
 
 function runAll() {
-  if (!sim) return
-  sim.run()
-  tick.value += 1
+  if (!sim || isAutoRunning.value) return
+  isAutoRunning.value = true
+  const tickAndSchedule = () => {
+    if (!sim || sim.isComplete) {
+      stopAutoRun()
+      return
+    }
+    sim.step()
+    tick.value += 1
+    runTimer = setTimeout(tickAndSchedule, STEP_INTERVAL_MS)
+  }
+  tickAndSchedule()
 }
+
+onBeforeUnmount(stopAutoRun)
 </script>
 
 <template>
@@ -122,6 +148,7 @@ function runAll() {
           v-model:moves="moves"
           :is-running="isRunning"
           :is-complete="isComplete"
+          :is-auto-running="isAutoRunning"
           :error="error"
           @start="start"
           @reset="reset"

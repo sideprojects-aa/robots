@@ -4,6 +4,7 @@ const props = defineProps<{
   moves: string
   isRunning: boolean
   isComplete: boolean
+  isAutoRunning: boolean
   error: string | null
 }>()
 
@@ -79,9 +80,10 @@ function append(ch: string) {
         Start
       </button>
       <template v-else>
-        <button class="btn" :disabled="isComplete" @click="emit('step')">Step</button>
-        <button class="btn primary" :disabled="isComplete" @click="emit('run')">
-          Run
+        <button class="btn" :disabled="isComplete || isAutoRunning" @click="emit('step')">Step</button>
+        <button class="btn primary" :disabled="isComplete || isAutoRunning" @click="emit('run')">
+          <span v-if="isAutoRunning" class="run-dot" aria-hidden></span>
+          {{ isAutoRunning ? 'Running' : 'Run' }}
         </button>
         <button class="btn ghost" @click="emit('reset')">Reset</button>
       </template>
@@ -242,5 +244,20 @@ textarea:disabled {
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.run-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  margin-right: 6px;
+  animation: run-pulse 0.8s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes run-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 </style>
