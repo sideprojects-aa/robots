@@ -16,7 +16,7 @@ type Snapshot = {
 const props = defineProps<{ snapshot: Snapshot | null }>()
 
 const CELL = 18 // pixels per world unit at zoom = 1
-const DEFAULT_ZOOM = 1.8
+const DEFAULT_ZOOM = 2.2
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 12
 
